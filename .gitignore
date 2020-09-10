@@ -1,5 +1,6 @@
 *.o
 *.d
+*.map
 nohal.elf
 nohal.hex
 nohal.bin

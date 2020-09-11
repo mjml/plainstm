@@ -1,7 +1,7 @@
 
-CPPSRC=
+CPPSRC=$(shell ls *.cpp)
 CSRC=$(shell ls *.c)
-OBJS=$(CSRC:.cpp=.obj) $(CPPSRC:.c=.o) startup_stm32f302x8.o system_stm32f3xx.o
+OBJS=$(CSRC:.c=.o) $(CPPSRC:.cpp=.obj) startup_stm32f302x8.o system_stm32f3xx.o
 CPP=arm-none-eabi-g++
 CC=arm-none-eabi-gcc
 AS=arm-none-eabi-gcc -x assembler-with-cpp
@@ -46,7 +46,7 @@ nohal.elf: $(OBJS)
 	$(SZ) $@
 
 %.obj: %.cpp
-	$(CPP) $(CPPFLAGS) -o $@ $<
+	$(CPP) $(CPPFLAGS) -o $@ -c $<
 
 %.o: %.c
 	$(CC) $(CFLAGS) -o $@ -c $<

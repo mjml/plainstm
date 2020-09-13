@@ -1,7 +1,7 @@
-
-CPPSRC=$(shell ls *.cpp)
-CSRC=$(shell ls *.c)
-OBJS=$(CSRC:.c=.o) $(CPPSRC:.cpp=.obj) startup_stm32f302x8.o system_stm32f3xx.o
+TARGET=nomx
+HAL=1
+CPPSRC=$(wildcard *.cpp)
+CSRC=$(wildcard *.c)
 CPP=arm-none-eabi-g++
 CC=arm-none-eabi-gcc
 AS=arm-none-eabi-gcc -x assembler-with-cpp
@@ -10,49 +10,76 @@ CP=arm-none-eabi-objcopy
 SZ=arm-none-eabi-size
 HEX=$(CP) -O ihex
 BIN=$(CP) -O binary -S
-CUBE=cube
+BUILDDIR=build
 
-MCU=-mcpu=cortex-m4 -mthumb -mfpu=fpv4-sp-d16 -mfloat-abi=hard
-
-INCLUDE= -I$(CUBE)/Drivers/CMSIS/Device/ST/STM32F3xx/Include -I$(CUBE)/Drivers/CMSIS/Core/Include -I$(CUBE)/Drivers/CMSIS/Include
+# Names: 1st used for system_stm32fxyyy.c file, 2nd for driver directory, 3rd for specific HAL device header file and startup assembly file
+CUBEDIR=cube
+arch_short=stm32f3xx
+ARCH_short=STM32F3xx
+arch_specific=stm32f302x8
+MCU=-mcpu=cortex-m4 -mthumb
 DEFS = -DSTM32F302x8
+OPT = -Og
+LDSCRIPT = STM32F302R6Tx_FLASH.ld
 
-ASFLAGS=$(MCU) -c -Wall -fdata-sections -ffunction-sections
-CFLAGS=$(MCU) $(INCLUDE) $(DEFS)
-CPPFLAGS=$(MCU) $(INCLUDE) $(DEFS)
+INCLUDE= -I. -I$(CUBEDIR)/Drivers/CMSIS/Device/ST/$(ARCH_short)/Include -I$(CUBEDIR)/Drivers/CMSIS/Core/Include -I$(CUBEDIR)/Drivers/CMSIS/Include
+ifeq ($(HAL),1)
+HALDIR=$(CUBEDIR)/Drivers/$(ARCH_short)_HAL_Driver
+HALINCLDIR=$(HALDIR)/Inc
+HALSRCDIR=$(HALDIR)/Src
+INCLUDE += -I$(HALINCLDIR)
+HALMODULES = cortex tim tim_ex gpio dac dma rcc 
+HALOBJS = $(arch_short)_hal.o $(patsubst %,$(arch_short)_hal_%.o,$(HALMODULES))
+endif
+
+ASFLAGS=$(MCU) -Wall -fdata-sections -ffunction-sections
+CFLAGS=$(MCU) $(OPT) $(INCLUDE) $(DEFS)
 ifeq ($(DEBUG), 1)
 CFLAGS += -g -gdwarf-2
 endif
-CFLAGS += -Og -MMD -MP -MF"$(@:%.o=%.d)"
+# I don't bother adding the fine-grained Makefile dependencies
+#CFLAGS += -MMD -MP -MF"$(@:%.o=%.d)"
+CPPFLAGS=$(CFLAGS)
 
-LDSCRIPT = STM32F302R6Tx_FLASH.ld
+OBJS=$(CPPSRC:.cpp=.obj) $(CSRC:.c=.o) startup_$(arch_specific).o system_$(arch_short).o $(HALOBJS)
+BUILDOBJS=$(patsubst %,$(BUILDDIR)/%,$(OBJS))
+
 LIBS=-lc -lm -lnosys
 LIBDIR=
-LDFLAGS=$(MCU) -specs=nano.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=nohal.map,--cref -Wl,--gc-sections
+LDFLAGS=$(MCU) -specs=nosys.specs -T$(LDSCRIPT) $(LIBDIR) $(LIBS) -Wl,-Map=$(TARGET).map,--cref
 
-all: nohal.hex
+all: $(TARGET).bin
 
 clean:
-	$(RM) -rf *.d *.o *.obj *.map nohal.elf nohal.hex
+	$(RM) -rf *.d *.o *.obj *.map $(TARGET).elf $(TARGET).hex $(TARGET).bin build/*
 
-nohal.hex: nohal.elf
+flash:
+	$(FLASH) write $(TARGET).elf 0x8000000
+
+$(TARGET).hex: $(TARGET).elf
 	$(HEX) $< $@
 
-nohal.bin: nohal.elf
+$(TARGET).bin: $(TARGET).elf
 	$(BIN) $< $@
 
-nohal.elf: $(OBJS)
-	$(CC) $(LDFLAGS) -o $@ $<
+$(TARGET).elf: $(BUILDOBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
 	$(SZ) $@
 
-%.obj: %.cpp
+$(BUILDDIR):
+	mkdir -p $(BUILDDIR)
+
+$(BUILDDIR)/%.obj: %.cpp $(BUILDDIR)
 	$(CPP) $(CPPFLAGS) -o $@ -c $<
 
-%.o: %.c
+$(BUILDDIR)/%.o: %.c $(BUILDDIR)
 	$(CC) $(CFLAGS) -o $@ -c $<
 
-%.o: %.s
+$(BUILDDIR)/%.o: %.s $(BUILDDIR)
 	$(AS) $(ASFLAGS) -o $@ -c $<
 
+$(BUILDDIR)/%.o: $(HALSRCDIR)/%.c
+	$(CC) $(CFLAGS) -o $@ -c $<
 
+.PHONY: clean all flash
 

@@ -1,17 +1,12 @@
-==================================================================================
-Creating a bare metal STM32 project without HAL or CubeMX project folder structure
-==================================================================================
+===================================================================
+Creating a bare metal STM32 project CubeMX project folder structure
+===================================================================
 
-Just 'git clone' the appropriate CubeMX firmware package into the subdirectory "cube". 
-You need the most up-to-date files from one of these.
-CubeMX will download these automatically if you use it to create a project.
+Just take a look at the Makefile.
 
-Copy the startup_xxx.s and system_yyy.s files into the source directory (here the root).
+There's a few lines to configure concerning your device and device class.
+You'll need to check out the appropriate CubeMX driver source repository
+  and give its path to the Makefile using the $(CUBE) variable.
 
-You'll have to make a dummy CubeMX project and copy the linker script STM32F3xyzbbc_FLASH.ld file into your project. 
-This is the worst step if you don't know gnu LD linker script (I do not). 
-Make sure that you tell CubeMX to create a "Makefile" type of project.
-You can also copy one out of one of the project examples in the cube folder.
-
-Now just create a Makefile by copying and tailoring the one from the CubeMX dummy project or the one given in this project's root.
+You can choose which $(HALMODULES) you want to compile in.
 
